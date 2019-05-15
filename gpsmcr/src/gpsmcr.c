@@ -21,6 +21,7 @@
 #include "gpsmcr.h"
 #include "gpsmcrinit.h"
 #include "gpsmcrlib.h"
+#include "chrony.h"
 
 //
 //	GPSMCR
@@ -93,6 +94,7 @@ int main(int argc, char *argv[])
 	time_t				st;
 	char 				nmea_buffer[MAX_1K_BUFFER];
 	int64				reftime, systime, delta;
+	int				chrony_fd;
 
 	memset(device_path,0,sizeof(device_path));
 	memset(serial_prefix,0,sizeof(serial_prefix));
@@ -109,7 +111,7 @@ int main(int argc, char *argv[])
 	gmtime_r(&st,&start_time);
 
 	do_not_fork = 0;
-	do_not_sync = 0;
+	do_not_sync = 1; //We don't want to sync. Let's chrony do it well
 	use_log_file = 1;
 	diff_sample_cnt = 0;
 	sync_mode = SYNC_INIT;
@@ -222,7 +224,16 @@ int main(int argc, char *argv[])
 		log_printf(MSG_ALWAYS,"fcntl() error for IPC socket: %s",strerror(errno));
 
 		return(-1);
-	}	
+	}
+
+	//
+	// Connect to the chrony UNIX socket
+	//
+	chrony_fd = chrony_init_socket();
+	if(chrony_fd == -1) {
+		fprintf(stderr, "Could not bind to chrony socket ! Launch chronyd first !");
+		return(-1);
+	}
 
 	//
 	// begin startup procedure and locate/identify card
@@ -573,7 +584,7 @@ int main(int argc, char *argv[])
 		sr_reftime.tv_sec = GetSecondsSince1970(&ref_tm);
 		sr_reftime.tv_nsec = 0;
 				
-		reftime = 1000000000 * sr_reftime.tv_sec;
+		reftime = BILLION * sr_reftime.tv_sec; //1s = 1 BILLION ns
 
 		// make a copy of reference information for reporting via the API
 		// note that subseconds is set to zero here because we are reporting
@@ -595,6 +606,13 @@ int main(int argc, char *argv[])
 		pthread_mutex_unlock(&api_report.mutex);
 
 		sync_critical_section(reftime, &systime, &delta);
+		//Delta now contains offset from reference (gps) time and
+		//clock (computer) time. It is in ns. Lets converti it to s
+		//without loosing precision or rouding the thing
+		long double ld_delta = delta;
+		double delta_s = ld_delta/BILLION;
+		chrony_send_delta(chrony_fd, delta_s);
+
 		
 		//
 		// perform calculations for jitter smoothing and drift tracking

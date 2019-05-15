@@ -18,8 +18,11 @@ gpsmcrlib.o: gpsmcrlib.c $(COMMON)
 gpsmcrinit.o: gpsmcrinit.c $(COMMON)
 	gcc -c gpsmcrinit.c
 
-gpsmcr: gpsmcr.c gpsmcrlib.o gpsmcrinit.o $(COMMON) 
-	gcc $(CONF) -o gpsmcr gpsmcr.c gpsmcrlib.o gpsmcrinit.o -lpthread -lrt
+chrony.o: chrony.c $(COMMON)
+	gcc -c chrony.c
+
+gpsmcr: gpsmcr.c gpsmcrlib.o gpsmcrinit.o chrony.o $(COMMON) 
+	gcc $(CONF) -o gpsmcr gpsmcr.c gpsmcrlib.o gpsmcrinit.o chrony.o -lpthread -lrt
 
 gmtool: gmtool.c gmtool.h gpsmcrlib.o $(COMMON)
 	gcc $(CONF) -o gmtool gmtool.c gpsmcrlib.o -lrt
