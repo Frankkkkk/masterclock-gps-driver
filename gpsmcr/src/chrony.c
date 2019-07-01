@@ -50,26 +50,29 @@ chrony_init_socket(void)
 void
 chrony_send_delta(int sock_fd, double delta)
 {
-    struct timespec offset;
-    struct sock_sample sample;
-    struct tm tm;
+	struct timespec offset;
+	struct sock_sample sample;
+	struct tm tm;
 
 
-    sample.pulse = 0; /* We are PPS but know date too */
-    sample.magic = CHRONY_SOCK_MAGIC;
-    sample.leap = 0; //XXX masterclock driver still doesnt support leap seconds ‽
+	sample.pulse = 0; /* We are PPS but know date too */
+	sample.magic = CHRONY_SOCK_MAGIC;
+	sample.leap = 0; //XXX masterclock driver still doesnt support leap seconds ‽
 
 
-    //system_time: CLOCK_REALTIME
-    struct timespec system_time;
-    clock_gettime(CLOCK_REALTIME, &system_time);
+	//system_time: CLOCK_REALTIME
+	struct timespec system_time;
+	clock_gettime(CLOCK_REALTIME, &system_time);
 
-    TSTOTV(&sample.tv, &system_time);
+	TSTOTV(&sample.tv, &system_time);
 
-    //The real deal: at (around) system_time, what was the difference (delta)
-    //between reference (GPS) time and (machine) clock time ?
-    sample.offset = -delta;
+	//The real deal: at (around) system_time, what was the difference (delta)
+	//between reference (GPS) time and (machine) clock time ?
+	sample.offset = -delta;
 
-    (void)send(sock_fd, &sample, sizeof(sample), 0);
+	if(send(sock_fd, &sample, sizeof(sample), 0) == -1) {
+		perror("Could not write to chrony socket. Will exit");
+		exit(1);
+	}
 }
 
