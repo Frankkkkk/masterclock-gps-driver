@@ -43,7 +43,7 @@ const char *lock_desc[6] = {
 const char *sync_desc[6] = {
 	"Disabled                   ",
 	"Waiting for Lock           ",
-	"Initializing               ",
+	"OK (Running)               ",
 	"Clock Tick Adjustment      ",
 	"Clock Frequency Adjustment ",
 	"Clock Frequency Maintenance"
@@ -70,7 +70,7 @@ int main(int argc, char *argv[])
 	char				altitude[12];
 	int					fix_quality;
 	int					satellites;
-	int					setcardsys, setcardntp, setcardman;
+	int					setcardsys, setcardntp, setcardman, show_forever;
 	int					ntp_sock;
 	NTPTIME				ntp;
 	char				ntp_server[256];
@@ -87,6 +87,7 @@ int main(int argc, char *argv[])
 	memset(ntp_server,0,sizeof(ntp_server));
 
 	setcardsys = setcardntp = setcardman = 0;
+	show_forever = 1; //While true
 
 	printf("GMTOOL for PCIe-GPS/PCIe-TCR/PCIe-OCS (version %u.%u.%u)\n",
 		GMTOOL_VER_MAJ,GMTOOL_VER_MIN,GMTOOL_VER_REV);
@@ -192,14 +193,21 @@ int main(int argc, char *argv[])
 			setcardntp = 1;
 
 			continue;
-          }
+		}
 
 		if (!strncmp(argv[x],"-setcardman",11))
 		{
 			setcardman = 1;
 
 			continue;
-          }
+		}
+
+		if (!strncmp(argv[x],"-oneshot",8))
+		{
+			show_forever = 0;
+
+			continue;
+		}
 
 		if (!strncmp(argv[x], "-h", 2))
 		{
@@ -207,12 +215,13 @@ int main(int argc, char *argv[])
 			printf("  -setcardsys         - set time on card from current system time (UTC/GMT)\n");
 			printf("  -setcardntp x       - set time on card from (S)NTP inquiry,\n");
 			printf("                        where 'x' is NTP server to query\n");
+			printf("  -oneshot            - Only show information once (not infinitely)\n");
 //			printf("  -setcardman x       - set time on card manually,\n");
 //			printf("                        where 'x' is HH:MM:SS MM/DD/YYYY\n");
 
 			return(0);
 		}
-    	}
+	}
 
 	//
 	// if we were requested to set time on the card using any of several methods, 
@@ -303,7 +312,7 @@ int main(int argc, char *argv[])
 
 	rtc_status = gps_status = tc_status = hso_status = hso_achieve = 0;
 	
-	while(1)
+	do
 	{
 		usleep(250000);
 
@@ -382,7 +391,7 @@ int main(int argc, char *argv[])
 
 		//
 		// get GPS navigation information
-		//	
+		//
 
 		write(ipc_sock,"E",1);
 
@@ -474,21 +483,24 @@ int main(int argc, char *argv[])
 		{
 			printf("Time delta:            +%lld sec, %.03f us        \n",
 				delta / BILLION, (double)(delta % BILLION) / 1000.0);
-		}				
-				
-		if (has_GPS) 
+		}
+
+		if (has_GPS)
 		{
 			printf("Latitude %s,%s  Longitude %s,%s  Altitude %s  Fix quality=%u  Satellites=%u      \n",
 				lat_string,lat_dir,long_string,long_dir,altitude,fix_quality,satellites);
 
-			printf("\033[8A");		
+			if(show_forever)
+				printf("\033[8A");
 		}
 		else
-			printf("\033[7A");		
+			if(show_forever)
+				printf("\033[7A");
 
 	}
+	while(show_forever);
 
-  	return(0);
+	return(0);
 }
 
 
