@@ -1,0 +1,39 @@
+version: '3'
+services:
+  chrony:
+    build: chrony
+    container_name: chrony
+    network_mode: "host"
+    devices:
+      - /dev/rtc:/dev/rtc
+      - /dev/ptp0:/dev/ptp0
+      - /dev/ptp1:/dev/ptp1
+    volumes:
+      - gps_socket:/shared
+    cap_add:
+      - SYS_TIME
+      - SYS_NICE
+      - SYS_RESOURCE
+      - NET_ADMIN
+    privileged: yes
+    restart: always
+
+  gpsmcr:
+    build: gpsmcr
+    container_name: gpsmcr
+    entrypoint: "bash -c 'sleep 3 && /gpsmcr -nofork'"
+    network_mode: "host"
+    depends_on:
+      - chrony
+    restart: always
+    devices:
+      - /dev/ttyS2:/dev/ttyS2
+      - /dev/ttyS3:/dev/ttyS3
+    volumes:
+      - gps_socket:/shared
+    cap_add:
+      - SYS_TIME
+
+volumes:
+  gps_socket:
+
